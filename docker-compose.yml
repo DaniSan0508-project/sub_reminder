@@ -1,7 +1,5 @@
-version: '3.8'
-
 services:
-  
+
   # 1. Serviço APP (PHP-FPM)
   app:
     build:
@@ -11,9 +9,14 @@ services:
     restart: unless-stopped
     working_dir: /var/www
     volumes:
-      - ./:/var/www # Mapeia o código local para dentro do contêiner
+      - ./:/var/www
     networks:
       - sub_reminder_net
+    depends_on:
+      - db # CORRIGIDO!
+      - redis # CORRIGIDO!
+    dns:
+      - '8.8.8.8'
 
   # 2. Serviço NGINX (Web Server)
   nginx:
@@ -21,7 +24,6 @@ services:
     container_name: sub_reminder_nginx
     restart: unless-stopped
     ports:
-      # Porta do HOST : Porta do CONTÊINER
       - "8090:80"
     volumes:
       - ./:/var/www
@@ -29,15 +31,14 @@ services:
     networks:
       - sub_reminder_net
     depends_on:
-      - app # Só inicia o Nginx depois que o 'app' estiver pronto
+      - app
 
   # 3. Serviço DB (Banco de Dados)
   db:
-    image: mariadb:10.8 # Usando MariaDB (compatível com MySQL)
+    image: mariadb:10.8
     container_name: sub_reminder_db
     restart: unless-stopped
     ports:
-      # Porta do HOST : Porta do CONTÊINER
       - "3390:3306"
     environment:
       MYSQL_DATABASE: ${DB_DATABASE:-laravel}
@@ -55,7 +56,6 @@ services:
     container_name: sub_reminder_redis
     restart: unless-stopped
     ports:
-      # Porta do HOST : Porta do CONTÊINER
       - "6379:6379"
     volumes:
       - sub_reminder_redis_data:/data
@@ -72,12 +72,15 @@ services:
     working_dir: /var/www
     volumes:
       - ./:/var/www
-    command: "php artisan queue:work --sleep=3 --tries=3" # O comando que ele vai rodar
+    command: "php artisan queue:work --sleep=3 --tries=3"
     networks:
       - sub_reminder_net
     depends_on:
       - app
-      - redis # Só inicia o worker depois do app e do redis
+      - redis
+    dns:
+      # <-- ADICIONADO AQUI TAMBÉM
+      - '8.8.8.8'
 
 # Redes e Volumes
 networks:
