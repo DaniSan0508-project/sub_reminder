@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  
+  # 1. Serviço APP (PHP-FPM)
+  app:
+    build:
+      context: . # O diretório atual
+      dockerfile: docker/app.Dockerfile
+    container_name: sub_reminder_app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www # Mapeia o código local para dentro do contêiner
+    networks:
+      - sub_reminder_net
+
+  # 2. Serviço NGINX (Web Server)
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: sub_reminder_nginx
+    restart: unless-stopped
+    ports:
+      # Porta do HOST : Porta do CONTÊINER
+      - "8090:80"
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - sub_reminder_net
+    depends_on:
+      - app # Só inicia o Nginx depois que o 'app' estiver pronto
+
+  # 3. Serviço DB (Banco de Dados)
+  db:
+    image: mariadb:10.8 # Usando MariaDB (compatível com MySQL)
+    container_name: sub_reminder_db
+    restart: unless-stopped
+    ports:
+      # Porta do HOST : Porta do CONTÊINER
+      - "3390:3306"
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-laravel}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_USER: ${DB_USERNAME:-laravel}
+    volumes:
+      - sub_reminder_db_data:/var/lib/mysql
+    networks:
+      - sub_reminder_net
+
+  # 4. Serviço REDIS (Cache e Filas)
+  redis:
+    image: redis:7.2-alpine
+    container_name: sub_reminder_redis
+    restart: unless-stopped
+    ports:
+      # Porta do HOST : Porta do CONTÊINER
+      - "6379:6379"
+    volumes:
+      - sub_reminder_redis_data:/data
+    networks:
+      - sub_reminder_net
+
+  # 5. Serviço WORKER (O 'operário' das filas)
+  worker:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+    container_name: sub_reminder_worker
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+    command: "php artisan queue:work --sleep=3 --tries=3" # O comando que ele vai rodar
+    networks:
+      - sub_reminder_net
+    depends_on:
+      - app
+      - redis # Só inicia o worker depois do app e do redis
+
+# Redes e Volumes
+networks:
+  sub_reminder_net:
+    driver: bridge
+
+volumes:
+  sub_reminder_db_data:
+    driver: local
+  sub_reminder_redis_data:
+    driver: local
