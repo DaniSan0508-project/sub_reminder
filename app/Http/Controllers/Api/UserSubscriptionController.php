@@ -10,12 +10,19 @@ use Illuminate\Support\Facades\Validator;
 
 class UserSubscriptionController extends Controller
 {
+
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        //
+        $user = $request->user();
+
+        $subscriptions = $user->subscriptions()->with('service')->get();
+
+        return response()->json([
+            'data' => $subscriptions
+        ], 200);
     }
 
     /**
