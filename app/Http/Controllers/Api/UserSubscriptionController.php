@@ -40,7 +40,7 @@ class UserSubscriptionController extends Controller
             return response()->json([
                 'message' => 'Erro de validação',
                 'errors' => $validator->errors()
-            ], 422); // 422 = Unprocessable Entity
+            ], 422);
         }
 
         $validatedData = $validator->validated();
@@ -53,16 +53,16 @@ class UserSubscriptionController extends Controller
         );
 
         $subscription = UserSubscription::create([
-            'user_id' => 1, // $request->user()->id, 
+            'user_id' => $request->user()->id,
             'service_id' => $validatedData['service_id'],
             'price' => $validatedData['price'],
-            'renewal_date' => $renewalDate->toDateString(), // Formato Y-m-d
+            'renewal_date' => $renewalDate->toDateString(),
             'renewal_period_value' => $validatedData['renewal_period_value'],
             'renewal_period_unit' => $validatedData['renewal_period_unit'],
             'notify_before_value' => $validatedData['notify_before_value'],
             'notify_before_unit' => $validatedData['notify_before_unit'],
 
-            'notification_date' => $notificationDate->toDateString(), // Formato Y-m-d
+            'notification_date' => $notificationDate->toDateString(),
         ]);
 
         return response()->json([
