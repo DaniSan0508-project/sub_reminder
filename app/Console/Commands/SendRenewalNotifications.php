@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\UserSubscription;
+use App\Jobs\SendRenewalNotificationJob;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Container\Attributes\Log;
@@ -27,6 +28,9 @@ class SendRenewalNotifications extends Command
     /**
      * Execute the console command.
      */
+    /**
+     * Execute o console command.
+     */
     public function handle()
     {
         $this->info('Iniciando verificação de notificações...');
@@ -43,19 +47,21 @@ class SendRenewalNotifications extends Command
             return;
         }
 
-        $this->info("Encontradas " . $subscriptionsToNotify->count() . " notificações para enviar.");
+        $this->info("Encontradas " . $subscriptionsToNotify->count() . " notificações para despachar.");
 
         foreach ($subscriptionsToNotify as $subscription) {
 
-            FacadesLog::info('[NOTIFICAÇÃO] Enviando aviso para User ID: ' . $subscription->user_id .
-                ' sobre a assinatura ID: ' . $subscription->id);
+            // 1. DESPACHA O JOB PARA A FILA
+            // Em vez de fazer o trabalho aqui, nós o "despachamos".
+            // O contêiner 'worker' vai pegar isso do 'redis' e executar.
+            SendRenewalNotificationJob::dispatch($subscription);
 
+            $this->info("Despachado Job para User ID: " . $subscription->user_id);
 
-            $subscription->update([
-                'last_notification_sent_at' => now()
-            ]);
+            // 2. REMOVEMOS A LÓGICA DE 'update' DAQUI
+            // O próprio Job será responsável por marcar como "enviado".
         }
 
-        $this->info('Verificação concluída.');
+        $this->info('Verificação concluída. Jobs despachados.');
     }
 }
