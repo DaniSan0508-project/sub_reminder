@@ -81,24 +81,80 @@ class UserSubscriptionController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(Request $request, UserSubscription $subscription)
     {
-        //
+        if ($request->user()->id !== $subscription->user_id) {
+            return response()->json([
+                'message' => 'Não autorizado'
+            ], 403);
+        }
+
+        $subscription->load('service');
+
+        return response()->json([
+            'data' => $subscription
+        ], 200);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(Request $request, UserSubscription $subscription)
     {
-        //
+        if ($request->user()->id !== $subscription->user_id) {
+            return response()->json(['message' => 'Não autorizado'], 403);
+        }
+
+
+        $validator = Validator::make($request->all(), [
+            'price' => 'sometimes|numeric|min:0',
+            'renewal_date' => 'sometimes|date|after_or_equal:today',
+            'renewal_period_value' => 'sometimes|integer|min:1',
+            'renewal_period_unit' => 'sometimes|string|in:day,month,year',
+            'notify_before_value' => 'sometimes|integer|min:1',
+            'notify_before_unit' => 'sometimes|string|in:day,month',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Erro de validação',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $validatedData = $validator->validated();
+
+        $subscription->update($validatedData);
+
+        $renewalDate = Carbon::parse($subscription->renewal_date);
+
+        $notificationDate = $renewalDate->copy()->sub(
+            $subscription->notify_before_value,
+            $subscription->notify_before_unit
+        );
+
+        $subscription->update([
+            'notification_date' => $notificationDate->toDateString(),
+            'last_notification_sent_at' => null,
+        ]);
+
+        return response()->json([
+            'message' => 'Assinatura atualizada com sucesso!',
+            'data' => $subscription
+        ], 200);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(Request $request, UserSubscription $subscription)
     {
-        //
+        if ($request->user()->id !== $subscription->user_id) {
+            return response()->json(['message' => 'Não autorizado'], 403);
+        }
+
+        $subscription->delete();
+
+        return response()->json(null, 204);
     }
 }
